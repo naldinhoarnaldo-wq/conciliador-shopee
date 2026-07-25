@@ -185,7 +185,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 7.0 PRO")
+    st.caption("Licença Comercial - Versão 7.1 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -376,29 +376,29 @@ if 'df_resultado' in st.session_state:
         else:
             df_exibicao = df_exibicao[df_exibicao['Auditoria'] == filtro_selecionado]
 
-    # FERRAMENTA DE CÓPIA RÁPIDA DE ID DE PEDIDO
-    st.markdown("### 📋 Copiar ID do Pedido")
-    lista_ids_disponiveis = df_exibicao['ID do pedido'].astype(str).tolist()
-    if lista_ids_disponiveis:
-        col_sel_copia, col_info_copia = st.columns([2, 2])
-        with col_sel_copia:
-            id_selecionado_copia = st.selectbox("Selecione o pedido para gerar o campo de cópia:", options=["Selecione um pedido..."] + lista_ids_disponiveis)
+    # PAINEL DE CÓPIA RÁPIDA DE PEDIDOS DIVERGENTES (BOTÃO AO LADO DO ID)
+    df_divergentes = df_exibicao[df_exibicao['Auditoria'] == 'Divergente']
+    if not df_divergentes.empty:
+        st.markdown("### 🚨 Acesso Rápido: Copiar IDs com Divergências")
+        st.info("Aqui estão listados todos os pedidos com divergência financeira encontrados. O botão de cópia está localizado diretamente ao lado de cada número de pedido.")
         
-        if id_selecionado_copia != "Selecione um pedido...":
-            with col_info_copia:
-                st.markdown("**ID Pronto para Cópia:** (Clique no ícone de cópia no canto superior direito)")
-                st.code(id_selecionado_copia, language=None)
+        for idx, row in df_divergentes.iterrows():
+            c_info, c_botao = st.columns([3, 2])
+            with c_info:
+                st.write(f"🏷️ **Pedido:** `{row['ID do pedido']}` — **Diferença:** `R$ {row['Diferenca']:.2f}`")
+            with c_botao:
+                st.code(str(row['ID do pedido']), language=None)
+        st.divider()
 
     st.markdown("### 📊 Visão Geral da Operação")
     
     col_metrica, col_grafico = st.columns([1, 2])
     
     with col_metrica:
-        divergentes = df_exibicao[df_exibicao['Auditoria'] == 'Divergente']
         st.metric(
             label="🚨 Divergências Financeiras (Furos)", 
-            value=f"{len(divergentes)} pedidos", 
-            delta=f"R$ {divergentes['Diferenca'].sum():.2f}",
+            value=f"{len(df_divergentes)} pedidos", 
+            delta=f"R$ {df_divergentes['Diferenca'].sum():.2f}",
             delta_color="inverse"
         )
         
