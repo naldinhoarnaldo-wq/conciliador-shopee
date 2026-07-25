@@ -14,7 +14,6 @@ CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
 SEGREDO_CRIPTO = "O-REI-DO-ECOMMERCE-2026-SEGREDO-ABSOLUTO"
 
 def gerar_token_vip():
-    """Gera o token mestre permanente para o Link VIP"""
     return hashlib.sha256(f"VIP-TOTAL-{SEGREDO_CRIPTO}".encode()).hexdigest()[:12]
 
 TOKEN_VIP_VALIDO = gerar_token_vip()
@@ -27,7 +26,7 @@ def gerar_assinatura_trial(valor):
 params = st.query_params
 vip_param = params.get("vip", "")
 
-# Valida se o Link VIP Permanente está ativo
+# Valida se o Link VIP Permanente está ativo na URL
 sistema_liberado = False
 if vip_param == TOKEN_VIP_VALIDO:
     sistema_liberado = True
@@ -78,21 +77,19 @@ with st.sidebar:
     
     if sistema_liberado:
         st.success("✅ **Computador Autorizado (PRO Permanente)**")
-        st.info("Este navegador está rodando na versão ilimitada graças ao seu Link VIP.")
+        st.info("Este navegador está rodando na versão ilimitada.")
     else:
         st.markdown("### 🔑 Ativação da Licença")
         licenca_inserida = st.text_input("Digite sua Chave PRO:", type="password")
         
-        if licenca_inserida == CHAVE_MESTRA_VALIDA:
-            sistema_liberado = True
-            st.success("✅ Chave Válida! Gerando seu acesso permanente...")
-            # Exibe instruções para salvar o link VIP
-            st.markdown("---")
-            st.markdown("🎯 **Acesso Liberado para o Computador!**")
-            st.markdown("Para não precisar digitar a senha nunca mais nesta máquina, **adicione esta página aos seus Favoritos (Ctrl + D)** ou use o link com o token VIP gerado na barra de endereços.")
-            st.rerun()
-        elif licenca_inserida != "":
-            st.error("❌ Chave inválida.")
+        if licenca_inserida != "":
+            if licenca_inserida == CHAVE_MESTRA_VALIDA:
+                # Injeta o token VIP diretamente na URL do navegador de forma limpa
+                st.query_params["vip"] = TOKEN_VIP_VALIDO
+                st.success("✅ Chave Válida! Acesso Permanente Liberado.")
+                st.rerun()
+            else:
+                st.error("❌ Chave inválida.")
 
     st.divider()
     st.markdown("### 🛒 Licença Comercial PRO")
@@ -104,11 +101,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 6.3 PRO")
-
-# Se a licença foi ativada agora por chave, injeta o token VIP na URL automaticamente
-if licenca_inserida == CHAVE_MESTRA_VALIDA and not sistema_liberado:
-    pass # Tratado acima com st.rerun se necessário
+    st.caption("Licença Comercial - Versão 6.4 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -128,7 +121,7 @@ with col_btn1:
 
 st.divider()
 
-# VERIFICAÇÃO DO LIMITE DE TRIAL (Se não for VIP e passou de 2 usos, bloqueia)
+# VERIFICAÇÃO DO LIMITE DE TRIAL
 if not sistema_liberado and tentativas_atuais >= 2:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
