@@ -184,7 +184,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 7.6 PRO")
+    st.caption("Licença Comercial - Versão 7.8 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -277,7 +277,7 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 df_agrupado = df_pedidos.groupby('ID do pedido').agg(
                     Status=('Status do pedido', 'first'),
                     Status_Reembolso=('Status da Devolução / Reembolso', 'first'),
-                    Data=('Data de criação do pedido', 'first'),
+                    Data=('Data de criação du pedido', 'first') if 'Data de criação du pedido' in df_pedidos.columns else ('Data de criação do pedido', 'first'),
                     Logistica=('Opção de envio', 'first'),
                     Valor_Total_Venda=('Subtotal do produto', 'sum'),
                     Liquido_Calculado=('Liquido_Linha', 'sum')
@@ -304,32 +304,17 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 else:
                     df_repasses_total['Taxa_Afiliado'] = 0
 
-                # Detecção automática de colunas de Ação Comercial / Participação
-                cols_acao_comercial = [c for c in df_repasses_total.columns if any(termo in str(c).lower() for termo in ['ação comercial', 'acao comercial', 'participação', 'participacao'])]
-                for c in cols_acao_comercial:
-                    df_repasses_total[c] = limpar_moeda(df_repasses_total[c])
+                df_rep_agrupado = df_repasses_total.groupby('ID do pedido').agg(
+                    Repasse_Realizado=('Quantia total lançada (R$)', 'sum'),
+                    Taxa_Afiliado=('Taxa_Afiliado', 'sum')
+                ).reset_index()
 
-                agg_dict = {
-                    'Repasse_Realizado': ('Quantia total lançada (R$)', 'sum'),
-                    'Taxa_Afiliado': ('Taxa_Afiliado', 'sum')
-                }
-                for c in cols_acao_comercial:
-                    agg_dict[f'ajuste_acao_{c}'] = (c, 'sum')
-
-                df_rep_agrupado = df_repasses_total.groupby('ID do pedido').agg(**agg_dict).reset_index()
-
-                # CRUZAMENTO FINAL
+                # CRUZAMENTO FINAL (Fórmula padrão precisa)
                 df_final = pd.merge(df_agrupado, df_rep_agrupado, on='ID do pedido', how='left')
                 df_final['Repasse_Realizado'] = df_final['Repasse_Realizado'].fillna(0)
                 df_final['Taxa_Afiliado'] = df_final['Taxa_Afiliado'].fillna(0)
                 
                 df_final['Liquido_Calculado'] = df_final['Liquido_Calculado'] - df_final['Taxa_Afiliado'].abs()
-                
-                for c in cols_acao_comercial:
-                    col_key = f'ajuste_acao_{c}'
-                    df_final[col_key] = df_final[col_key].fillna(0)
-                    df_final['Liquido_Calculado'] = df_final['Liquido_Calculado'] - df_final[col_key].abs()
-
                 df_final['Diferenca'] = df_final['Repasse_Realizado'] - df_final['Liquido_Calculado']
 
                 def is_returned_or_cancelled(row):
