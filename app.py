@@ -184,7 +184,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 7.3 PRO")
+    st.caption("Licença Comercial - Versão 7.5 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -304,10 +304,19 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 else:
                     df_repasses_total['Taxa_Afiliado'] = 0
 
-                df_rep_agrupado = df_repasses_total.groupby('ID do pedido').agg(
-                    Repasse_Realizado=('Quantia total lançada (R$)', 'sum'),
-                    Taxa_Afiliado=('Taxa_Afiliado', 'sum')
-                ).reset_index()
+                # Detecção automática de colunas de Ação Comercial / Participação
+                cols_acao_comercial = [c for c in df_repasses_total.columns if any(termo in str(c).lower() for termo in ['ação comercial', 'acao comercial', 'participação', 'participacao'])]
+                for c in cols_acao_comercial:
+                    df_repasses_total[c] = limpar_moeda(df_repasses_total[c])
+
+                agg_dict = {
+                    'Repasse_Realizado': ('Quantia total lançada (R$)', 'sum'),
+                    'Taxa_Afiliado': ('Taxa_Afiliado', 'sum')
+                }
+                for c in cols_acao_comercial:
+                    agg_dict[f'ajuste_acao_{c}'] = (c, 'sum')
+
+                df_rep_agrupado = df_repasses_total.groupby('ID do pedido').agg(**agg_dict).reset_index()
 
                 # CRUZAMENTO FINAL
                 df_final = pd.merge(df_agrupado, df_rep_agrupado, on='ID do pedido', how='left')
@@ -315,6 +324,12 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 df_final['Taxa_Afiliado'] = df_final['Taxa_Afiliado'].fillna(0)
                 
                 df_final['Liquido_Calculado'] = df_final['Liquido_Calculado'] - df_final['Taxa_Afiliado'].abs()
+                
+                for c in cols_acao_comercial:
+                    col_key = f'ajuste_acao_{c}'
+                    df_final[col_key] = df_final[col_key].fillna(0)
+                    df_final['Liquido_Calculado'] = df_final['Liquido_Calculado'] - df_final[col_key].abs()
+
                 df_final['Diferenca'] = df_final['Repasse_Realizado'] - df_final['Liquido_Calculado']
 
                 def is_returned_or_cancelled(row):
@@ -396,40 +411,43 @@ if 'df_resultado' in st.session_state:
         contagem_status.columns = ['Status da Auditoria', 'Quantidade de Pedidos']
         st.bar_chart(data=contagem_status, x='Status da Auditoria', y='Quantidade de Pedidos', color="#D4AF37", use_container_width=True)
 
-    st.markdown("### 📋 Lista Detalhada com Cópia Rápida (Por Linha)")
-    st.info("💡 Cada pedido filtrado abaixo exibe o número do pedido acompanhado diretamente do seu botão de cópia individual.")
+    st.markdown("### 📋 Tabela Interativa com Cópia Rápida por ID")
+    st.info("💡 Cada linha abaixo exibe o ID do pedido com seu respectivo botão de cópia rápido integrado ao lado.")
 
-    # LISTA INTERATIVA COM BOTÃO DE CÓPIA AO LADO DE CADA PEDIDO
+    # Cabeçalho da tabela customizada interativa
+    h_col1, h_col2, h_col3, h_col4, h_col5, h_col6 = st.columns([2, 1, 1, 1, 1, 1])
+    with h_col1: st.markdown("**ID do Pedido (Copiar)**")
+    with h_col2: st.markdown("**Status**")
+    with h_col3: st.markdown("**Data**")
+    with h_col4: st.markdown("**Diferença**")
+    with h_col5: st.markdown("**Financeiro**")
+    with h_col6: st.markdown("**Auditoria**")
+    st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
+
+    # Linhas interativas com o botão de cópia ao lado de cada ID do pedido
     for idx, row in df_exibicao.iterrows():
-        c_id, c_status, c_diff, c_copia = st.columns([2, 1, 1, 2])
-        with c_id:
-            st.markdown(f"**Pedido:** `{row['ID do pedido']}`")
-        with c_status:
-            st.markdown(f"**Audit:** {row['Auditoria']}")
-        with c_diff:
-            st.markdown(f"**Dif:** `R$ {row['Diferenca']:.2f}`")
-        with c_copia:
+        r_col1, r_col2, r_col3, r_col4, r_col5, r_col6 = st.columns([2, 1, 1, 1, 1, 1])
+        with r_col1:
             st.code(str(row['ID do pedido']), language=None)
-        st.divider()
-
-    # Tabela geral completa para visualização e conferência estendida
-    st.markdown("### 🔍 Tabela Geral Consolidada")
-    def color_auditoria(val):
-        if val == 'Divergente': return 'color: white; background-color: #8B0000; font-weight: bold;'
-        if val == 'Bateu Perfeito': return 'color: green;'
-        if val == 'Ainda não recebido': return 'color: #D2691E;'
-        return ''
-
-    st.dataframe(
-        df_exibicao.style.map(color_auditoria, subset=['Auditoria']).format({
-            'Valor_Total_Venda': 'R$ {:.2f}',
-            'Liquido_Calculado': 'R$ {:.2f}',
-            'Repasse_Realizado': 'R$ {:.2f}',
-            'Taxa_Afiliado': 'R$ {:.2f}',
-            'Diferenca': 'R$ {:.2f}'
-        }), 
-        use_container_width=True
-    )
+        with r_col2:
+            st.write(str(row['Status']))
+        with r_col3:
+            st.write(str(row['Data']))
+        with r_col4:
+            dif_val = row['Diferenca']
+            cor_dif = "red" if dif_val < 0 else "green"
+            st.markdown(f"<span style='color:{cor_dif}; font-weight:bold;'>R$ {dif_val:.2f}</span>", unsafe_allow_html=True)
+        with r_col5:
+            st.write(str(row['Status Financeiro']))
+        with r_col6:
+            aud = row['Auditoria']
+            if aud == 'Divergente':
+                st.markdown("<span style='color:white; background-color:#8B0000; padding:2px 6px; border-radius:4px; font-weight:bold;'>Divergente</span>", unsafe_allow_html=True)
+            elif aud == 'Bateu Perfeito':
+                st.markdown("<span style='color:green; font-weight:bold;'>Bateu Perfeito</span>", unsafe_allow_html=True)
+            else:
+                st.write(aud)
+        st.markdown("<hr style='margin: 5px 0; opacity: 0.2;'>", unsafe_allow_html=True)
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
