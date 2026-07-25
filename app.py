@@ -3,25 +3,38 @@ import pandas as pd
 import io
 import hashlib
 import hmac
-import base64
+import json
+import os
 from PIL import Image
 
 # Configuração da página
 st.set_page_config(page_title="Conciliador Shopee PRO", page_icon="👑", layout="wide")
 
 # ----------------------------------------
-# SISTEMA DE LICENCIAMENTO HÍBRIDO (SUPORTA HEX E BASE64)
+# SISTEMA DE LICENCIAMENTO COM LIMITE DE DISPOSITIVOS
 # ----------------------------------------
 CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
 SEGREDO_CRIPTO = "O-REI-DO-ECOMMERCE-2026-SEGREDO-ABSOLUTO"
+ARQUIVO_REGISTRO = "licencas_ativas.json"
 
-def gerar_token_vip():
-    return hashlib.sha256(f"VIP-TOTAL-{SEGREDO_CRIPTO}".encode()).hexdigest()[:12]
+def carregar_registro():
+    if os.path.exists(ARQUIVO_REGISTRO):
+        try:
+            with open(ARQUIVO_REGISTRO, "r") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
 
-TOKEN_VIP_VALIDO = gerar_token_vip()
+def salvar_registro(registro):
+    try:
+        with open(ARQUIVO_REGISTRO, "w") as f:
+            json.dump(registro, f)
+    except:
+        pass
 
-def validar_chave(chave):
-    """Valida a chave mestre, chaves em Hex ou chaves em Base64"""
+def validar_assinatura_criptografica(chave):
+    """Valida se a chave é matematicamente verdadeira (gerada por você)"""
     chave = chave.strip()
     if chave == CHAVE_MESTRA_VALIDA:
         return True, "Mestre"
@@ -37,48 +50,52 @@ def validar_chave(chave):
         payload, assinatura_recebida = corpo.split(".", 1)
         assinatura_recebida = assinatura_recebida.upper()
         
-        # 1. Tenta validar como Hex
-        try:
-            assinatura_esperada_hex = hmac.new(
-                SEGREDO_CRIPTO.encode('utf-8'),
-                payload.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()[:8].upper()
-            
-            if hmac.compare_digest(assinatura_esperada_hex, assinatura_recebida):
-                cliente_bytes = bytes.fromhex(payload)
-                return True, cliente_bytes.decode('utf-8')
-        except Exception:
-            pass
-
-        # 2. Tenta validar como Base64 (compatibilidade com gerador anterior)
-        assinatura_esperada_b64 = hmac.new(
-            SEGREDO_CRIPTO.encode('utf-8'),
-            payload.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()[:8].upper()
-        
-        if hmac.compare_digest(assinatura_esperada_b64, assinatura_recebida):
-            padding = '=' * (-len(payload) % 4)
-            cliente_bytes = base64.urlsafe_b64decode(payload + padding)
-            return True, cliente_bytes.decode('utf-8')
-            
-    except Exception:
+        # Tenta Hex ou Base64
+        for modo in ["hex", "b64"]:
+            try:
+                assinatura_esperada = hmac.new(
+                    SEGREDO_CRIPTO.encode('utf-8'),
+                    payload.encode('utf-8'),
+                    hashlib.sha256
+                ).hexdigest()[:8].upper()
+                
+                if hmac.compare_digest(assinatura_esperada, assinatura_recebida):
+                    if modo == "hex":
+                        cliente_bytes = bytes.fromhex(payload)
+                    else:
+                        padding = '=' * (-len(payload) % 4)
+                        cliente_bytes = base64.urlsafe_b64decode(payload + padding)
+                    return True, cliente_bytes.decode('utf-8')
+            except:
+                continue
+    except:
         pass
-        
     return False, None
 
 def gerar_assinatura_trial(valor):
     dados = f"{valor}-{SEGREDO_CRIPTO}"
     return hashlib.sha256(dados.encode()).hexdigest()[:10]
 
-# Lê os parâmetros da URL
-params = st.query_params
-vip_param = params.get("vip", "")
+# Lê os parâmetros da URL do navegador atual
+params = query_params = st.query_params
+device_id = params.get("device", "")
+chave_ativa_url = params.get("key", "")
 
+# Se não tem ID de dispositivo neste navegador, gera um único para ele
+if not device_id:
+    device_id = hashlib.sha256(os.urandom(16)).hexdigest()[:12]
+    st.query_params["device"] = device_id
+
+# Valida se o dispositivo atual já está autorizado para esta chave
 sistema_liberado = False
-if vip_param == TOKEN_VIP_VALIDO:
-    sistema_liberado = True
+mensagem_erro_licenca = ""
+
+registro = carregar_registro()
+
+if chave_ativa_url in registro:
+    dispositivos_cadastrados = registro[chave_ativa_url]["dispositivos"]
+    if device_id in dispositivos_cadastrados:
+        sistema_liberado = True
 
 # Leitura do controle de tentativas para quem está no modo Trial
 try:
@@ -133,11 +150,35 @@ with st.sidebar:
         licenca_inserida = st.text_input("Digite sua Chave PRO:", type="password")
         
         if licenca_inserida != "":
-            valido, nome_cliente = validar_chave(licenca_inserida)
+            valido, nome_cliente = validar_assinatura_criptografica(licenca_inserida)
             if valido:
-                st.query_params["vip"] = TOKEN_VIP_VALIDO
-                st.success(f"✅ Chave Válida! Bem-vindo, {nome_cliente}!")
-                st.rerun()
+                # Verifica controle de limite de dispositivos (Máximo de 2 por chave)
+                if licenca_inserida == CHAVE_MESTRA_VALIDA:
+                    # Chave mestre libera direto sem limite de dispositivos
+                    st.query_params["key"] = licenca_inserida
+                    st.success("✅ Chave Mestra Ativada!")
+                    st.rerun()
+                else:
+                    if licenca_inserida not in registro:
+                        registro[licenca_inserida] = {"dispositivos": [], "cliente": nome_cliente}
+                    
+                    dispositivos = registro[licenca_inserida]["dispositivos"]
+                    
+                    if device_id in dispositivos:
+                        st.query_params["key"] = licenca_inserida
+                        sistema_liberado = True
+                        st.rerun()
+                    elif len(dispositivos) < 2:
+                        # Adiciona este dispositivo ao limite da chave (máximo 2)
+                        dispositivos.append(device_id)
+                        registro[licenca_inserida]["dispositivos"] = dispositivos
+                        salvar_registro(registro)
+                        
+                        st.query_params["key"] = licenca_inserida
+                        st.success(f"✅ Licença ativada para {nome_cliente}!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Esta chave já atingiu o limite máximo de 2 computadores/navegadores permitidos.")
             else:
                 st.error("❌ Chave inválida.")
 
@@ -151,7 +192,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 6.8 PRO")
+    st.caption("Licença Comercial - Versão 6.9 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
