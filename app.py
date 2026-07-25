@@ -8,29 +8,13 @@ from PIL import Image
 st.set_page_config(page_title="Conciliador Shopee PRO", page_icon="👑", layout="wide")
 
 # ----------------------------------------
-# SISTEMA DE LICENCIAMENTO COM BLINDAGEM CRIPTOGRÁFICA
+# SISTEMA DE LICENCIAMENTO COM SESSÃO BLINDADA
 # ----------------------------------------
 CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
-SEGREDO_CRIPTO = "O-REI-DO-ECOMMERCE-2026-SEGREDO-ABSOLUTO"
 
-def gerar_assinatura(valor):
-    """Gera um selo criptográfico impossível de ser forjado sem o segredo"""
-    dados = f"{valor}-{SEGREDO_CRIPTO}"
-    return hashlib.sha256(dados.encode()).hexdigest()[:10]
-
-# Lê o contador e a assinatura direto da URL do navegador
-params = st.query_params
-try:
-    tentativas_atuais = int(params.get("uso", 0))
-    assinatura_recebida = params.get("hash", "")
-    
-    # Valida se a assinatura confere com o número de usos (Anti-Fraude)
-    assinatura_esperada = gerar_assinatura(tentativas_atuais)
-    if assinatura_recebida != assinatura_esperada and tentativas_atuais > 0:
-        # Se alterou a URL na maldade, força o bloqueio imediato
-        tentativas_atuais = 999 
-except ValueError:
-    tentativas_atuais = 999
+# Inicializa as variáveis de controle na sessão do navegador (impossível zerar apagando a URL)
+if 'tentativas_realizadas' not in st.session_state:
+    st.session_state['tentativas_realizadas'] = 0
 
 if 'form_id' not in st.session_state:
     st.session_state['form_id'] = 0
@@ -78,7 +62,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 5.6 PRO")
+    st.caption("Licença Comercial - Versão 5.7 PRO")
 
 # Validação se a licença informada é a válida
 sistema_liberado = False
@@ -100,21 +84,21 @@ col_btn1, col_btn2 = st.columns([1, 3])
 with col_btn1:
     if st.button("🔄 Nova Conciliação"):
         for key in list(st.session_state.keys()):
-            if key != 'form_id':
+            if key not in ['form_id', 'tentativas_realizadas']:
                 del st.session_state[key]
         st.session_state['form_id'] += 1
         st.rerun()
 
 st.divider()
 
-# VERIFICAÇÃO DO LIMITE DE TRIAL (TRAVA APÓS 2 USOS COMPLETOS)
-if not sistema_liberado and tentativas_atuais >= 2:
+# VERIFICAÇÃO DO LIMITE DE TRIAL (TRAVA DEFINITIVA NA SESSÃO)
+if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 2:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
     st.stop()
 
 if not sistema_liberado:
-    chances_restantes = 2 - tentativas_atuais
+    chances_restantes = 2 - st.session_state['tentativas_realizadas']
     st.info(f"💡 **Modo Demonstração Ativo:** Você tem **{chances_restantes} conciliação(ões) gratuita(s)** de teste antes do bloqueio comercial.")
 
 # ========================================
@@ -240,10 +224,8 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 )
 
                 if not sistema_liberado:
-                    novo_uso = tentativas_atuais + 1
-                    # Grava o novo uso junto com a assinatura criptografada na URL
-                    st.query_params["uso"] = novo_uso
-                    st.query_params["hash"] = gerar_assinatura(novo_uso)
+                    # Incrementa o uso direto na sessão do navegador (imutável por URL)
+                    st.session_state['tentativas_realizadas'] += 1
 
                 st.session_state['df_resultado'] = df_final
                 st.success("✅ Auditoria finalizada com precisão.")
