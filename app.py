@@ -64,7 +64,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 5.4")
+    st.caption("Licença Comercial - Versão 5.5")
 
 # Validação se a licença informada é a válida
 sistema_liberado = False
@@ -93,7 +93,7 @@ with col_btn1:
 
 st.divider()
 
-# VERIFICAÇÃO DO LIMITE DE TRIAL (TRAVA APÓS 2 USOS COMPLETOS)
+# VERIFICAÇÃO DO LIMITE DE TRIAL (TRAVA SOMENTE APÓS COMPLETAR 2 USOS)
 if not sistema_liberado and tentativas_atuais >= 2:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
@@ -226,7 +226,7 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 )
 
                 if not sistema_liberado:
-                    # Incrementa exatamente 1 uso por clique no botão de processar
+                    # Incrementa o uso somente após concluir o processamento com sucesso
                     st.query_params["uso"] = tentativas_atuais + 1
 
                 st.session_state['df_resultado'] = df_final
