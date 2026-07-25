@@ -184,7 +184,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 7.2 PRO")
+    st.caption("Licença Comercial - Versão 7.3 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -375,25 +375,11 @@ if 'df_resultado' in st.session_state:
         else:
             df_exibicao = df_exibicao[df_exibicao['Auditoria'] == filtro_selecionado]
 
-    # BARRA DE CÓPIA RÁPIDA INTEGRADA LOGO ACIMA DA TABELA PRINCIPAL
-    df_divergentes = df_exibicao[df_exibicao['Auditoria'] == 'Divergente']
-    if not df_divergentes.empty:
-        st.markdown("### 📋 Cópia Rápida de Pedidos Divergentes")
-        c_sel_id, c_code_box = st.columns([2, 2])
-        with c_sel_id:
-            pedido_para_copiar = st.selectbox(
-                "Selecione o pedido divergente para copiar o ID instantaneamente:",
-                options=df_divergentes['ID do pedido'].astype(str).tolist()
-            )
-        with c_code_box:
-            st.markdown("**ID Pronto (clique no ícone de cópia ao lado):**")
-            st.code(pedido_para_copiar, language=None)
-        st.divider()
-
     st.markdown("### 📊 Visão Geral da Operação")
     
     col_metrica, col_grafico = st.columns([1, 2])
     
+    df_divergentes = df_final[df_final['Auditoria'] == 'Divergente']
     with col_metrica:
         st.metric(
             label="🚨 Divergências Financeiras (Furos)", 
@@ -410,6 +396,24 @@ if 'df_resultado' in st.session_state:
         contagem_status.columns = ['Status da Auditoria', 'Quantidade de Pedidos']
         st.bar_chart(data=contagem_status, x='Status da Auditoria', y='Quantidade de Pedidos', color="#D4AF37", use_container_width=True)
 
+    st.markdown("### 📋 Lista Detalhada com Cópia Rápida (Por Linha)")
+    st.info("💡 Cada pedido filtrado abaixo exibe o número do pedido acompanhado diretamente do seu botão de cópia individual.")
+
+    # LISTA INTERATIVA COM BOTÃO DE CÓPIA AO LADO DE CADA PEDIDO
+    for idx, row in df_exibicao.iterrows():
+        c_id, c_status, c_diff, c_copia = st.columns([2, 1, 1, 2])
+        with c_id:
+            st.markdown(f"**Pedido:** `{row['ID do pedido']}`")
+        with c_status:
+            st.markdown(f"**Audit:** {row['Auditoria']}")
+        with c_diff:
+            st.markdown(f"**Dif:** `R$ {row['Diferenca']:.2f}`")
+        with c_copia:
+            st.code(str(row['ID do pedido']), language=None)
+        st.divider()
+
+    # Tabela geral completa para visualização e conferência estendida
+    st.markdown("### 🔍 Tabela Geral Consolidada")
     def color_auditoria(val):
         if val == 'Divergente': return 'color: white; background-color: #8B0000; font-weight: bold;'
         if val == 'Bateu Perfeito': return 'color: green;'
