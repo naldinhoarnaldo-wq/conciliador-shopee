@@ -184,7 +184,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 7.8 PRO")
+    st.caption("Licença Comercial - Versão 7.9 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -298,7 +298,7 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 df_repasses_total = pd.concat(list_df_repasses, ignore_index=True)
                 df_repasses_total['Quantia total lançada (R$)'] = limpar_moeda(df_repasses_total['Quantia total lançada (R$)'])
                 
-                col_afiliado = 'Taxa de comissão Afiliados do Vendedor'
+                col_afiliado = 'Taxa de comissão Afiliados du Vendedor' if 'Taxa de comissão Afiliados du Vendedor' in df_repasses_total.columns else 'Taxa de comissão Afiliados do Vendedor'
                 if col_afiliado in df_repasses_total.columns:
                     df_repasses_total['Taxa_Afiliado'] = limpar_moeda(df_repasses_total[col_afiliado])
                 else:
@@ -309,7 +309,7 @@ if file_pedidos and len(arquivos_repasses) > 0:
                     Taxa_Afiliado=('Taxa_Afiliado', 'sum')
                 ).reset_index()
 
-                # CRUZAMENTO FINAL (Fórmula padrão precisa)
+                # CRUZAMENTO FINAL
                 df_final = pd.merge(df_agrupado, df_rep_agrupado, on='ID do pedido', how='left')
                 df_final['Repasse_Realizado'] = df_final['Repasse_Realizado'].fillna(0)
                 df_final['Taxa_Afiliado'] = df_final['Taxa_Afiliado'].fillna(0)
@@ -418,21 +418,23 @@ if 'df_resultado' in st.session_state:
         st.write(f"**Status da Auditoria:** `{detalhe_row['Auditoria']}` | **Status Financeiro:** `{detalhe_row['Status Financeiro']}`")
 
     st.markdown("### 📋 Tabela Interativa com Cópia Rápida por ID")
-    st.info("💡 Cada linha abaixo exibe o ID do pedido com seu respectivo botão de cópia rápido integrado ao lado.")
+    st.info("💡 Cada linha abaixo exibe o ID do pedido com seu respectivo botão de cópia rápido integrado ao lado, além dos valores estimados e repassados.")
 
-    # Cabeçalho da tabela customizada interativa
-    h_col1, h_col2, h_col3, h_col4, h_col5, h_col6 = st.columns([2, 1, 1, 1, 1, 1])
+    # Cabeçalho da tabela customizada interativa (Com colunas de Estimado e Repassado)
+    h_col1, h_col2, h_col3, h_col4, h_col5, h_col6, h_col7, h_col8 = st.columns([2, 1, 1, 1, 1, 1, 1, 1])
     with h_col1: st.markdown("**ID do Pedido (Copiar)**")
     with h_col2: st.markdown("**Status**")
     with h_col3: st.markdown("**Data**")
-    with h_col4: st.markdown("**Diferença**")
-    with h_col5: st.markdown("**Financeiro**")
-    with h_col6: st.markdown("**Auditoria**")
+    with h_col4: st.markdown("**Estimado**")
+    with h_col5: st.markdown("**Repassado**")
+    with h_col6: st.markdown("**Diferença**")
+    with h_col7: st.markdown("**Financeiro**")
+    with h_col8: st.markdown("**Auditoria**")
     st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 
-    # Linhas interativas com o botão de cópia ao lado de cada ID do pedido
+    # Linhas interativas com os valores estimados e repassados visíveis
     for idx, row in df_exibicao.iterrows():
-        r_col1, r_col2, r_col3, r_col4, r_col5, r_col6 = st.columns([2, 1, 1, 1, 1, 1])
+        r_col1, r_col2, r_col3, r_col4, r_col5, r_col6, r_col7, r_col8 = st.columns([2, 1, 1, 1, 1, 1, 1, 1])
         with r_col1:
             st.code(str(row['ID do pedido']), language=None)
         with r_col2:
@@ -440,12 +442,16 @@ if 'df_resultado' in st.session_state:
         with r_col3:
             st.write(str(row['Data']))
         with r_col4:
+            st.write(f"R$ {row['Liquido_Calculado']:.2f}")
+        with r_col5:
+            st.write(f"R$ {row['Repasse_Realizado']:.2f}")
+        with r_col6:
             dif_val = row['Diferenca']
             cor_dif = "red" if dif_val < 0 else "green"
             st.markdown(f"<span style='color:{cor_dif}; font-weight:bold;'>R$ {dif_val:.2f}</span>", unsafe_allow_html=True)
-        with r_col5:
+        with r_col7:
             st.write(str(row['Status Financeiro']))
-        with r_col6:
+        with r_col8:
             aud = row['Auditoria']
             if aud == 'Divergente':
                 st.markdown("<span style='color:white; background-color:#8B0000; padding:2px 6px; border-radius:4px; font-weight:bold;'>Divergente</span>", unsafe_allow_html=True)
