@@ -34,7 +34,6 @@ def salvar_registro(registro):
         pass
 
 def validar_assinatura_criptografica(chave):
-    """Valida se a chave é matematicamente verdadeira (gerada por você)"""
     chave = chave.strip()
     if chave == CHAVE_MESTRA_VALIDA:
         return True, "Mestre"
@@ -185,7 +184,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 7.1 PRO")
+    st.caption("Licença Comercial - Versão 7.2 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -376,18 +375,19 @@ if 'df_resultado' in st.session_state:
         else:
             df_exibicao = df_exibicao[df_exibicao['Auditoria'] == filtro_selecionado]
 
-    # PAINEL DE CÓPIA RÁPIDA DE PEDIDOS DIVERGENTES (BOTÃO AO LADO DO ID)
+    # BARRA DE CÓPIA RÁPIDA INTEGRADA LOGO ACIMA DA TABELA PRINCIPAL
     df_divergentes = df_exibicao[df_exibicao['Auditoria'] == 'Divergente']
     if not df_divergentes.empty:
-        st.markdown("### 🚨 Acesso Rápido: Copiar IDs com Divergências")
-        st.info("Aqui estão listados todos os pedidos com divergência financeira encontrados. O botão de cópia está localizado diretamente ao lado de cada número de pedido.")
-        
-        for idx, row in df_divergentes.iterrows():
-            c_info, c_botao = st.columns([3, 2])
-            with c_info:
-                st.write(f"🏷️ **Pedido:** `{row['ID do pedido']}` — **Diferença:** `R$ {row['Diferenca']:.2f}`")
-            with c_botao:
-                st.code(str(row['ID do pedido']), language=None)
+        st.markdown("### 📋 Cópia Rápida de Pedidos Divergentes")
+        c_sel_id, c_code_box = st.columns([2, 2])
+        with c_sel_id:
+            pedido_para_copiar = st.selectbox(
+                "Selecione o pedido divergente para copiar o ID instantaneamente:",
+                options=df_divergentes['ID do pedido'].astype(str).tolist()
+            )
+        with c_code_box:
+            st.markdown("**ID Pronto (clique no ícone de cópia ao lado):**")
+            st.code(pedido_para_copiar, language=None)
         st.divider()
 
     st.markdown("### 📊 Visão Geral da Operação")
