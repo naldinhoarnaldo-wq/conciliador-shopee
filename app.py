@@ -76,15 +76,15 @@ with st.sidebar:
     st.divider()
     
     if sistema_liberado:
-        st.success("✅ **Computador Autorizado (PRO Permanente)**")
-        st.info("Este navegador está rodando na versão ilimitada.")
+        st.success("✅ **Computador Autorizado (PRO)**")
+        st.markdown("🎯 **Dica de Ouro:** Para não precisar digitar a senha nunca mais, **adicione esta página aos seus Favoritos (Ctrl + D)**.")
+        st.info("O link atual na barra de endereços já garante seu acesso ilimitado permanente nesta máquina.")
     else:
         st.markdown("### 🔑 Ativação da Licença")
         licenca_inserida = st.text_input("Digite sua Chave PRO:", type="password")
         
         if licenca_inserida != "":
             if licenca_inserida == CHAVE_MESTRA_VALIDA:
-                # Injeta o token VIP diretamente na URL do navegador de forma limpa
                 st.query_params["vip"] = TOKEN_VIP_VALIDO
                 st.success("✅ Chave Válida! Acesso Permanente Liberado.")
                 st.rerun()
@@ -101,7 +101,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 6.4 PRO")
+    st.caption("Licença Comercial - Versão 6.5 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
