@@ -50,7 +50,6 @@ def validar_assinatura_criptografica(chave):
         payload, assinatura_recebida = corpo.split(".", 1)
         assinatura_recebida = assinatura_recebida.upper()
         
-        # Tenta Hex ou Base64
         for modo in ["hex", "b64"]:
             try:
                 assinatura_esperada = hmac.new(
@@ -77,27 +76,24 @@ def gerar_assinatura_trial(valor):
     return hashlib.sha256(dados.encode()).hexdigest()[:10]
 
 # Lê os parâmetros da URL do navegador atual
-params = query_params = st.query_params
+params = st.query_params
 device_id = params.get("device", "")
 chave_ativa_url = params.get("key", "")
 
-# Se não tem ID de dispositivo neste navegador, gera um único para ele
 if not device_id:
     device_id = hashlib.sha256(os.urandom(16)).hexdigest()[:12]
     st.query_params["device"] = device_id
 
-# Valida se o dispositivo atual já está autorizado para esta chave
 sistema_liberado = False
-mensagem_erro_licenca = ""
-
 registro = carregar_registro()
 
 if chave_ativa_url in registro:
     dispositivos_cadastrados = registro[chave_ativa_url]["dispositivos"]
     if device_id in dispositivos_cadastrados:
         sistema_liberado = True
+elif chave_ativa_url == CHAVE_MESTRA_VALIDA:
+    sistema_liberado = True
 
-# Leitura do controle de tentativas para quem está no modo Trial
 try:
     tentativas_atuais = int(params.get("uso", 0))
     assinatura_recebida = params.get("hash", "")
@@ -152,9 +148,7 @@ with st.sidebar:
         if licenca_inserida != "":
             valido, nome_cliente = validar_assinatura_criptografica(licenca_inserida)
             if valido:
-                # Verifica controle de limite de dispositivos (Máximo de 2 por chave)
                 if licenca_inserida == CHAVE_MESTRA_VALIDA:
-                    # Chave mestre libera direto sem limite de dispositivos
                     st.query_params["key"] = licenca_inserida
                     st.success("✅ Chave Mestra Ativada!")
                     st.rerun()
@@ -169,7 +163,6 @@ with st.sidebar:
                         sistema_liberado = True
                         st.rerun()
                     elif len(dispositivos) < 2:
-                        # Adiciona este dispositivo ao limite da chave (máximo 2)
                         dispositivos.append(device_id)
                         registro[licenca_inserida]["dispositivos"] = dispositivos
                         salvar_registro(registro)
@@ -192,7 +185,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 6.9 PRO")
+    st.caption("Licença Comercial - Versão 7.0 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -382,6 +375,19 @@ if 'df_resultado' in st.session_state:
             df_exibicao = df_exibicao[df_exibicao['Auditoria'] == '-']
         else:
             df_exibicao = df_exibicao[df_exibicao['Auditoria'] == filtro_selecionado]
+
+    # FERRAMENTA DE CÓPIA RÁPIDA DE ID DE PEDIDO
+    st.markdown("### 📋 Copiar ID do Pedido")
+    lista_ids_disponiveis = df_exibicao['ID do pedido'].astype(str).tolist()
+    if lista_ids_disponiveis:
+        col_sel_copia, col_info_copia = st.columns([2, 2])
+        with col_sel_copia:
+            id_selecionado_copia = st.selectbox("Selecione o pedido para gerar o campo de cópia:", options=["Selecione um pedido..."] + lista_ids_disponiveis)
+        
+        if id_selecionado_copia != "Selecione um pedido...":
+            with col_info_copia:
+                st.markdown("**ID Pronto para Cópia:** (Clique no ícone de cópia no canto superior direito)")
+                st.code(id_selecionado_copia, language=None)
 
     st.markdown("### 📊 Visão Geral da Operação")
     
