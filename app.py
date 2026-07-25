@@ -78,7 +78,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 6.0 PRO")
+    st.caption("Licença Comercial - Versão 6.1 PRO")
 
 # Validação se a licença informada é a válida
 sistema_liberado = False
@@ -110,15 +110,16 @@ st.divider()
 # Sincroniza o estado atual com o arquivo persistente
 st.session_state['tentativas_realizadas'] = ler_tentativas()
 
-# VERIFICAÇÃO DO LIMITE DE TRIAL (Bloqueia permanentemente após 2 usos)
-if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 2:
+# VERIFICAÇÃO DO LIMITE DE TRIAL (Bloqueia apenas se tentar passar de 2 usos)
+if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 3:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
     st.stop()
 
 if not sistema_liberado:
-    chances_restantes = 2 - st.session_state['tentativas_realizadas']
-    st.info(f"💡 **Modo Demonstração Ativo:** Você tem **{chances_restantes} conciliação(ões) gratuita(s)** de teste antes do bloqueio comercial.")
+    usos_atuais = st.session_state['tentativas_realizadas']
+    chances_restantes = max(0, 2 - usos_atuais)
+    st.info(f"💡 **Modo Demonstração Ativo:** Você tem **{chances_restantes} conciliação(ões) gratuita(s)** restante(s) antes do bloqueio comercial.")
 
 # ========================================
 # FLUXO DE UPLOAD E PROCESSAMENTO
@@ -158,7 +159,7 @@ if file_pedidos and len(arquivos_repasses) > 0:
     if st.button("🚀 Processar Conciliação", type="primary"):
         tentativas_atuais = ler_tentativas()
         if not sistema_liberado and tentativas_atuais >= 2:
-            st.warning("Limite de testes atingido! Adquira a versão PRO.")
+            st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**. Adquira a versão PRO para continuar.")
             st.stop()
 
         if not sistema_liberado:
