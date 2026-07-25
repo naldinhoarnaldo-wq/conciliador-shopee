@@ -12,7 +12,7 @@ st.set_page_config(page_title="Conciliador Shopee PRO", page_icon="👑", layout
 # ----------------------------------------
 CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
 
-# Inicializa as variáveis de controle na sessão do navegador (impossível zerar apagando a URL)
+# Inicializa as variáveis de controle na sessão do navegador
 if 'tentativas_realizadas' not in st.session_state:
     st.session_state['tentativas_realizadas'] = 0
 
@@ -62,7 +62,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 5.7 PRO")
+    st.caption("Licença Comercial - Versão 5.8 PRO")
 
 # Validação se a licença informada é a válida
 sistema_liberado = False
@@ -91,7 +91,7 @@ with col_btn1:
 
 st.divider()
 
-# VERIFICAÇÃO DO LIMITE DE TRIAL (TRAVA DEFINITIVA NA SESSÃO)
+# VERIFICAÇÃO DO LIMITE DE TRIAL (TRAVA APÓS COMPLETAR 2 USOS, OU SEJA, >= 2)
 if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 2:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
@@ -224,7 +224,7 @@ if file_pedidos and len(arquivos_repasses) > 0:
                 )
 
                 if not sistema_liberado:
-                    # Incrementa o uso direto na sessão do navegador (imutável por URL)
+                    # Incrementa o uso na sessão após concluir a conciliação
                     st.session_state['tentativas_realizadas'] += 1
 
                 st.session_state['df_resultado'] = df_final
