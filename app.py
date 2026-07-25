@@ -1,19 +1,36 @@
 import streamlit as st
 import pandas as pd
 import io
-import hashlib
+import os
 from PIL import Image
 
 # Configuração da página
 st.set_page_config(page_title="Conciliador Shopee PRO", page_icon="👑", layout="wide")
 
 # ----------------------------------------
-# SISTEMA DE LICENCIAMENTO COM SESSÃO BLINDADA
+# SISTEMA DE LICENCIAMENTO PERSISTENTE (ANTIFRAUDE / F5)
 # ----------------------------------------
 CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
+ARQUIVO_CONTADOR = "uso_trial.txt"
+
+def ler_tentativas():
+    if os.path.exists(ARQUIVO_CONTADOR):
+        try:
+            with open(ARQUIVO_CONTADOR, "r") as f:
+                return int(f.read().strip())
+        except:
+            return 0
+    return 0
+
+def salvar_tentativas(valor):
+    try:
+        with open(ARQUIVO_CONTADOR, "w") as f:
+            f.write(str(valor))
+    except:
+        pass
 
 if 'tentativas_realizadas' not in st.session_state:
-    st.session_state['tentativas_realizadas'] = 0
+    st.session_state['tentativas_realizadas'] = ler_tentativas()
 
 if 'form_id' not in st.session_state:
     st.session_state['form_id'] = 0
@@ -61,7 +78,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 5.9 PRO")
+    st.caption("Licença Comercial - Versão 6.0 PRO")
 
 # Validação se a licença informada é a válida
 sistema_liberado = False
@@ -90,7 +107,10 @@ with col_btn1:
 
 st.divider()
 
-# VERIFICAÇÃO DO LIMITE DE TRIAL (Bloqueia apenas se já executou 2 vezes e tentar a 3ª)
+# Sincroniza o estado atual com o arquivo persistente
+st.session_state['tentativas_realizadas'] = ler_tentativas()
+
+# VERIFICAÇÃO DO LIMITE DE TRIAL (Bloqueia permanentemente após 2 usos)
 if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 2:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
@@ -136,13 +156,15 @@ def limpar_moeda(coluna):
 # Motor de Processamento
 if file_pedidos and len(arquivos_repasses) > 0:
     if st.button("🚀 Processar Conciliação", type="primary"):
-        # Trava de segurança extra no clique: se não for liberado e já tiver feito 2, barra antes de rodar
-        if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 2:
+        tentativas_atuais = ler_tentativas()
+        if not sistema_liberado and tentativas_atuais >= 2:
             st.warning("Limite de testes atingido! Adquira a versão PRO.")
             st.stop()
 
         if not sistema_liberado:
-            st.session_state['tentativas_realizadas'] += 1
+            novo_valor = tentativas_atuais + 1
+            st.session_state['tentativas_realizadas'] = novo_valor
+            salvar_tentativas(novo_valor)
 
         with st.spinner("Consolidando bases financeiras, abatendo devoluções e auditando transações..."):
             try:
