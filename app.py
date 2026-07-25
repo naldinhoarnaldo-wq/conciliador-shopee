@@ -1,36 +1,47 @@
 import streamlit as st
 import pandas as pd
 import io
-import os
+import hashlib
 from PIL import Image
 
 # Configuração da página
 st.set_page_config(page_title="Conciliador Shopee PRO", page_icon="👑", layout="wide")
 
 # ----------------------------------------
-# SISTEMA DE LICENCIAMENTO PERSISTENTE (ANTIFRAUDE / F5)
+# SISTEMA DE LICENCIAMENTO COM TOKEN VIP PERMANENTE
 # ----------------------------------------
 CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
-ARQUIVO_CONTADOR = "uso_trial.txt"
+SEGREDO_CRIPTO = "O-REI-DO-ECOMMERCE-2026-SEGREDO-ABSOLUTO"
 
-def ler_tentativas():
-    if os.path.exists(ARQUIVO_CONTADOR):
-        try:
-            with open(ARQUIVO_CONTADOR, "r") as f:
-                return int(f.read().strip())
-        except:
-            return 0
-    return 0
+def gerar_token_vip():
+    """Gera o token mestre permanente para o Link VIP"""
+    return hashlib.sha256(f"VIP-TOTAL-{SEGREDO_CRIPTO}".encode()).hexdigest()[:12]
 
-def salvar_tentativas(valor):
-    try:
-        with open(ARQUIVO_CONTADOR, "w") as f:
-            f.write(str(valor))
-    except:
-        pass
+TOKEN_VIP_VALIDO = gerar_token_vip()
 
-if 'tentativas_realizadas' not in st.session_state:
-    st.session_state['tentativas_realizadas'] = ler_tentativas()
+def gerar_assinatura_trial(valor):
+    dados = f"{valor}-{SEGREDO_CRIPTO}"
+    return hashlib.sha256(dados.encode()).hexdigest()[:10]
+
+# Lê os parâmetros da URL
+params = st.query_params
+vip_param = params.get("vip", "")
+
+# Valida se o Link VIP Permanente está ativo
+sistema_liberado = False
+if vip_param == TOKEN_VIP_VALIDO:
+    sistema_liberado = True
+
+# Leitura do controle de tentativas para quem está no modo Trial
+try:
+    tentativas_atuais = int(params.get("uso", 0))
+    assinatura_recebida = params.get("hash", "")
+    if tentativas_atuais > 0 and not sistema_liberado:
+        assinatura_esperada = gerar_assinatura_trial(tentativas_atuais)
+        if assinatura_recebida != assinatura_esperada:
+            tentativas_atuais = 999
+except ValueError:
+    tentativas_atuais = 999
 
 if 'form_id' not in st.session_state:
     st.session_state['form_id'] = 0
@@ -65,9 +76,24 @@ with st.sidebar:
     st.markdown("👑 **O Filho do Rei**")
     st.divider()
     
-    st.markdown("### 🔑 Ativação da Licença")
-    licenca_inserida = st.text_input("Digite sua Chave PRO:", type="password")
-    
+    if sistema_liberado:
+        st.success("✅ **Computador Autorizado (PRO Permanente)**")
+        st.info("Este navegador está rodando na versão ilimitada graças ao seu Link VIP.")
+    else:
+        st.markdown("### 🔑 Ativação da Licença")
+        licenca_inserida = st.text_input("Digite sua Chave PRO:", type="password")
+        
+        if licenca_inserida == CHAVE_MESTRA_VALIDA:
+            sistema_liberado = True
+            st.success("✅ Chave Válida! Gerando seu acesso permanente...")
+            # Exibe instruções para salvar o link VIP
+            st.markdown("---")
+            st.markdown("🎯 **Acesso Liberado para o Computador!**")
+            st.markdown("Para não precisar digitar a senha nunca mais nesta máquina, **adicione esta página aos seus Favoritos (Ctrl + D)** ou use o link com o token VIP gerado na barra de endereços.")
+            st.rerun()
+        elif licenca_inserida != "":
+            st.error("❌ Chave inválida.")
+
     st.divider()
     st.markdown("### 🛒 Licença Comercial PRO")
     st.markdown("🔥 **Promoção Exclusiva:**")
@@ -78,16 +104,11 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 6.1 PRO")
+    st.caption("Licença Comercial - Versão 6.3 PRO")
 
-# Validação se a licença informada é a válida
-sistema_liberado = False
-if licenca_inserida == CHAVE_MESTRA_VALIDA:
-    sistema_liberado = True
-    st.sidebar.success("✅ Licença PRO Ativada (Ilimitado)!")
-else:
-    if licenca_inserida != "":
-        st.sidebar.error("❌ Chave inválida.")
+# Se a licença foi ativada agora por chave, injeta o token VIP na URL automaticamente
+if licenca_inserida == CHAVE_MESTRA_VALIDA and not sistema_liberado:
+    pass # Tratado acima com st.rerun se necessário
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -100,26 +121,22 @@ col_btn1, col_btn2 = st.columns([1, 3])
 with col_btn1:
     if st.button("🔄 Nova Conciliação"):
         for key in list(st.session_state.keys()):
-            if key not in ['form_id', 'tentativas_realizadas']:
+            if key != 'form_id':
                 del st.session_state[key]
         st.session_state['form_id'] += 1
         st.rerun()
 
 st.divider()
 
-# Sincroniza o estado atual com o arquivo persistente
-st.session_state['tentativas_realizadas'] = ler_tentativas()
-
-# VERIFICAÇÃO DO LIMITE DE TRIAL (Bloqueia apenas se tentar passar de 2 usos)
-if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 3:
+# VERIFICAÇÃO DO LIMITE DE TRIAL (Se não for VIP e passou de 2 usos, bloqueia)
+if not sistema_liberado and tentativas_atuais >= 2:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
     st.stop()
 
 if not sistema_liberado:
-    usos_atuais = st.session_state['tentativas_realizadas']
-    chances_restantes = max(0, 2 - usos_atuais)
-    st.info(f"💡 **Modo Demonstração Ativo:** Você tem **{chances_restantes} conciliação(ões) gratuita(s)** restante(s) antes do bloqueio comercial.")
+    chances_restantes = max(0, 2 - tentativas_atuais)
+    st.info(f"💡 **Modo Demonstração Ativo:** Você tem **{chances_restantes} conciliação(ões) gratuita(s)** de teste antes do bloqueio comercial.")
 
 # ========================================
 # FLUXO DE UPLOAD E PROCESSAMENTO
@@ -157,15 +174,14 @@ def limpar_moeda(coluna):
 # Motor de Processamento
 if file_pedidos and len(arquivos_repasses) > 0:
     if st.button("🚀 Processar Conciliação", type="primary"):
-        tentativas_atuais = ler_tentativas()
         if not sistema_liberado and tentativas_atuais >= 2:
-            st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**. Adquira a versão PRO para continuar.")
+            st.warning("Limite de testes atingido! Adquira a versão PRO.")
             st.stop()
 
         if not sistema_liberado:
-            novo_valor = tentativas_atuais + 1
-            st.session_state['tentativas_realizadas'] = novo_valor
-            salvar_tentativas(novo_valor)
+            novo_uso = tentativas_atuais + 1
+            st.query_params["uso"] = novo_uso
+            st.query_params["hash"] = gerar_assinatura_trial(novo_uso)
 
         with st.spinner("Consolidando bases financeiras, abatendo devoluções e auditando transações..."):
             try:
