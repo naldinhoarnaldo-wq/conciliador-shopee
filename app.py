@@ -184,7 +184,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 7.5 PRO")
+    st.caption("Licença Comercial - Versão 7.6 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
@@ -410,6 +410,27 @@ if 'df_resultado' in st.session_state:
         contagem_status = df_exibicao['Auditoria'].value_counts().reset_index()
         contagem_status.columns = ['Status da Auditoria', 'Quantidade de Pedidos']
         st.bar_chart(data=contagem_status, x='Status da Auditoria', y='Quantidade de Pedidos', color="#D4AF37", use_container_width=True)
+
+    # PAINEL DE INVESTIGAÇÃO DE PEDIDOS
+    st.markdown("### 🔎 Painel de Investigação de Pedido")
+    st.info("💡 Digite ou selecione um ID de pedido abaixo para conferir detalhadamente os valores calculados vs repassados e entender o motivo de qualquer divergência.")
+    
+    ids_lista = df_final['ID do pedido'].astype(str).tolist()
+    pedido_investigado = st.selectbox("Selecione o pedido para inspecionar:", options=["Selecione um pedido..."] + ids_lista)
+    
+    if pedido_investigado != "Selecione um pedido...":
+        detalhe_row = df_final[df_final['ID do pedido'].astype(str) == pedido_investigado].iloc[0]
+        
+        col_det1, col_det2, col_det3, col_det4 = st.columns(4)
+        with col_det1:
+            st.metric("Venda Total", f"R$ {detalhe_row['Valor_Total_Venda']:.2f}")
+        with col_det2:
+            st.metric("Líquido Esperado", f"R$ {detalhe_row['Liquido_Calculado']:.2f}")
+        with col_det3:
+            st.metric("Repasse Real", f"R$ {detalhe_row['Repasse_Realizado']:.2f}")
+        with col_det4:
+            st.metric("Diferença (Furo)", f"R$ {detalhe_row['Diferenca']:.2f}", delta_color="inverse")
+        st.write(f"**Status da Auditoria:** `{detalhe_row['Auditoria']}` | **Status Financeiro:** `{detalhe_row['Status Financeiro']}`")
 
     st.markdown("### 📋 Tabela Interativa com Cópia Rápida por ID")
     st.info("💡 Cada linha abaixo exibe o ID do pedido com seu respectivo botão de cópia rápido integrado ao lado.")
