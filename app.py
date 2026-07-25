@@ -2,13 +2,15 @@ import streamlit as st
 import pandas as pd
 import io
 import hashlib
+import hmac
+import base64
 from PIL import Image
 
 # Configuração da página
 st.set_page_config(page_title="Conciliador Shopee PRO", page_icon="👑", layout="wide")
 
 # ----------------------------------------
-# SISTEMA DE LICENCIAMENTO COM TOKEN VIP PERMANENTE
+# SISTEMA DE LICENCIAMENTO HÍBRIDO (SUPORTA HEX E BASE64)
 # ----------------------------------------
 CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
 SEGREDO_CRIPTO = "O-REI-DO-ECOMMERCE-2026-SEGREDO-ABSOLUTO"
@@ -18,6 +20,54 @@ def gerar_token_vip():
 
 TOKEN_VIP_VALIDO = gerar_token_vip()
 
+def validar_chave(chave):
+    """Valida a chave mestre, chaves em Hex ou chaves em Base64"""
+    chave = chave.strip()
+    if chave == CHAVE_MESTRA_VALIDA:
+        return True, "Mestre"
+    
+    try:
+        if not chave.startswith("REI-") or not chave.endswith("-PRO"):
+            return False, None
+        
+        corpo = chave[4:-4]
+        if "." not in corpo:
+            return False, None
+        
+        payload, assinatura_recebida = corpo.split(".", 1)
+        assinatura_recebida = assinatura_recebida.upper()
+        
+        # 1. Tenta validar como Hex
+        try:
+            assinatura_esperada_hex = hmac.new(
+                SEGREDO_CRIPTO.encode('utf-8'),
+                payload.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()[:8].upper()
+            
+            if hmac.compare_digest(assinatura_esperada_hex, assinatura_recebida):
+                cliente_bytes = bytes.fromhex(payload)
+                return True, cliente_bytes.decode('utf-8')
+        except Exception:
+            pass
+
+        # 2. Tenta validar como Base64 (compatibilidade com gerador anterior)
+        assinatura_esperada_b64 = hmac.new(
+            SEGREDO_CRIPTO.encode('utf-8'),
+            payload.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()[:8].upper()
+        
+        if hmac.compare_digest(assinatura_esperada_b64, assinatura_recebida):
+            padding = '=' * (-len(payload) % 4)
+            cliente_bytes = base64.urlsafe_b64decode(payload + padding)
+            return True, cliente_bytes.decode('utf-8')
+            
+    except Exception:
+        pass
+        
+    return False, None
+
 def gerar_assinatura_trial(valor):
     dados = f"{valor}-{SEGREDO_CRIPTO}"
     return hashlib.sha256(dados.encode()).hexdigest()[:10]
@@ -26,7 +76,6 @@ def gerar_assinatura_trial(valor):
 params = st.query_params
 vip_param = params.get("vip", "")
 
-# Valida se o Link VIP Permanente está ativo na URL
 sistema_liberado = False
 if vip_param == TOKEN_VIP_VALIDO:
     sistema_liberado = True
@@ -84,9 +133,10 @@ with st.sidebar:
         licenca_inserida = st.text_input("Digite sua Chave PRO:", type="password")
         
         if licenca_inserida != "":
-            if licenca_inserida == CHAVE_MESTRA_VALIDA:
+            valido, nome_cliente = validar_chave(licenca_inserida)
+            if valido:
                 st.query_params["vip"] = TOKEN_VIP_VALIDO
-                st.success("✅ Chave Válida! Acesso Permanente Liberado.")
+                st.success(f"✅ Chave Válida! Bem-vindo, {nome_cliente}!")
                 st.rerun()
             else:
                 st.error("❌ Chave inválida.")
@@ -101,7 +151,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 6.5 PRO")
+    st.caption("Licença Comercial - Versão 6.8 PRO")
 
 # ----------------------------------------
 # CABEÇALHO PRINCIPAL
