@@ -12,7 +12,6 @@ st.set_page_config(page_title="Conciliador Shopee PRO", page_icon="👑", layout
 # ----------------------------------------
 CHAVE_MESTRA_VALIDA = "REI-SHOPEE-2026-PRO"
 
-# Inicializa as variáveis de controle na sessão do navegador
 if 'tentativas_realizadas' not in st.session_state:
     st.session_state['tentativas_realizadas'] = 0
 
@@ -62,7 +61,7 @@ with st.sidebar:
     st.link_button("💬 Comprar por R$ 49,90", link_whatsapp, type="primary")
     
     st.divider()
-    st.caption("Licença Comercial - Versão 5.8 PRO")
+    st.caption("Licença Comercial - Versão 5.9 PRO")
 
 # Validação se a licença informada é a válida
 sistema_liberado = False
@@ -91,7 +90,7 @@ with col_btn1:
 
 st.divider()
 
-# VERIFICAÇÃO DO LIMITE DE TRIAL (TRAVA APÓS COMPLETAR 2 USOS, OU SEJA, >= 2)
+# VERIFICAÇÃO DO LIMITE DE TRIAL (Bloqueia apenas se já executou 2 vezes e tentar a 3ª)
 if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 2:
     st.warning("🔒 **VOCÊ ATINGIU O LIMITE DE TESTES GRATUITOS (2 CONCILIAÇÕES)**")
     st.info("Para continuar auditando sua operação de forma ilimitada, adquire a sua licença definitiva por apenas **R$ 49,90** clicando no botão do WhatsApp na barra lateral ou digite sua chave PRO válida para liberar o acesso instantaneamente.")
@@ -137,6 +136,14 @@ def limpar_moeda(coluna):
 # Motor de Processamento
 if file_pedidos and len(arquivos_repasses) > 0:
     if st.button("🚀 Processar Conciliação", type="primary"):
+        # Trava de segurança extra no clique: se não for liberado e já tiver feito 2, barra antes de rodar
+        if not sistema_liberado and st.session_state['tentativas_realizadas'] >= 2:
+            st.warning("Limite de testes atingido! Adquira a versão PRO.")
+            st.stop()
+
+        if not sistema_liberado:
+            st.session_state['tentativas_realizadas'] += 1
+
         with st.spinner("Consolidando bases financeiras, abatendo devoluções e auditando transações..."):
             try:
                 # PROCESSAR PEDIDOS
@@ -222,10 +229,6 @@ if file_pedidos and len(arquivos_repasses) > 0:
                     ascending=[False, True], 
                     key=lambda x: x.map({'Divergente': 1, 'Bateu Perfeito': 2, 'Ainda não recebido': 3, '-': 4})
                 )
-
-                if not sistema_liberado:
-                    # Incrementa o uso na sessão após concluir a conciliação
-                    st.session_state['tentativas_realizadas'] += 1
 
                 st.session_state['df_resultado'] = df_final
                 st.success("✅ Auditoria finalizada com precisão.")
